@@ -1,18 +1,22 @@
 
+trait MatrixLike<const J: usize, const I: usize> {
+    // type Other<const A: usize, const B: usize>: MatrixLike<A,B>;
+    type Transposed: MatrixLike<I,J>;
+    type Concat<const Y: usize>: MatrixLike<J,Y>;
+    type Concatenated<const X: usize>: MatrixLike<J,X>;
 
-// trait MatrixLike<const J: usize, const I: usize> {
-//     fn shape(&self) -> (usize,usize);
+    fn shape(&self) -> (usize,usize);
 
-//     fn transpose(&self) -> dyn MatrixLike<I,J>; // how precise can this be at the trait level?
+    fn transpose(&self) -> Self::Transposed;
+    fn concat<const Y: usize, const X: usize>(&self, other: Self::Concat<Y>) -> Self::Concatenated<X>;
 
-//     fn dot(&self, other: Self) -> usize;
+    // fn elemwise_add(&self, other: Self) -> Self;
+    // fn elemwise_product(&self, other: Self) -> Self;
 
-//     fn elemwise_add(&self, other: Self) -> Self;
-//     fn elemwise_product(&self, other: Self) -> Self;
-
-//     fn add<const K: usize>(&self, other: impl MatrixLike<J, K>) -> Box<dyn MatrixLike<J,I+K>>; //how to achieve this?
-//     fn mul(&self, other: Self) -> Self;
-// }
+    // fn dot(&self, other: Self) -> usize;
+    
+    // fn mul(&self, other: Self) -> Self;
+}
 
 
 #[derive(PartialEq, Debug)]
@@ -27,8 +31,17 @@ pub struct Matrix<const J: usize, const I: usize> {
     ncols: usize
 }
 
-impl<const J: usize, const I: usize> Matrix<J,I> {
-    pub fn transpose(&self) -> Matrix<I, J> {
+impl<const J: usize, const I: usize> MatrixLike<J,I> for Matrix<J,I> {
+    type Transposed = Matrix<I,J>;
+    type Concat<const Y: usize> = Matrix<J,Y>;
+    type Concatenated<const X: usize> = Matrix<J,X>;
+    // type Other<const A: usize, const B: usize> = Matrix<A,B>;
+
+    fn shape(&self) -> (usize,usize) {
+        (self.nrows,self.ncols)
+    }
+
+    fn transpose(&self) -> Matrix<I, J> {
 
         let mut res = [[0_usize; J]; I];
         for i in 0..self.ncols {
@@ -38,7 +51,23 @@ impl<const J: usize, const I: usize> Matrix<J,I> {
         }   
         Matrix::new(res)
     }
+
+    fn concat<const Y: usize, const X: usize>(&self, other: Self::Concat<Y>) -> Self::Concatenated<X> {
+        let mut res = [[0_usize; X]; J];
+        for j in 0..self.nrows {
+            for i in 0..self.ncols {
+                res[j][i] = self.values[j][i]
+            }
+        }
+        for j in 0..other.nrows {
+            for i in 0..other.ncols {
+                res[j][i+self.ncols] = other.values[j][i]
+            }
+        }
+        Matrix::new(res)
+    }
 }
+
 
 impl<const J: usize, const I: usize> Matrix<J,I> {
     pub fn new(data: [[usize; I]; J]) -> Matrix<J,I> {
@@ -47,10 +76,6 @@ impl<const J: usize, const I: usize> Matrix<J,I> {
             ncols: data[0].len(),
             values: Box::new(data),
         }
-    }
-
-    pub fn shape(&self) -> (usize,usize) {
-        (self.nrows,self.ncols)
     }
 }
 
@@ -85,5 +110,13 @@ mod tests {
         let mat = Matrix::new([[1_usize,2],[4,5],[7,8]]);
         let res = mat.transpose();
         assert_eq!(res, Matrix::new([[1_usize,4,7],[2,5,8]]));
+    }
+
+    #[test]
+    fn concatenation() {
+        let a = Matrix::new([[1_usize],[2],[3]]);
+        let b = Matrix::new([[1_usize,2],[3,4],[5,6]]);
+        let res = a.concat(b);
+        assert_eq!(res, Matrix::new([[1_usize,1,2],[2,3,4],[3,5,6]]))
     }
 }
