@@ -1,49 +1,62 @@
+use std::ops::{Add,Mul};
+use std::fmt::{Display};
 
-trait MatrixLike<const J: usize, const I: usize> {
-    // type Other<const A: usize, const B: usize>: MatrixLike<A,B>;
-    type Transposed: MatrixLike<I,J>;
-    type Concat<const Y: usize>: MatrixLike<J,Y>;
-    type Concatenated<const X: usize>: MatrixLike<J,X>;
-
-    fn shape(&self) -> (usize,usize);
-
-    fn transpose(&self) -> Self::Transposed;
-    fn concat<const Y: usize, const X: usize>(&self, other: Self::Concat<Y>) -> Self::Concatenated<X>;
-
-    // fn elemwise_add(&self, other: Self) -> Self;
-    // fn elemwise_product(&self, other: Self) -> Self;
-
-    // fn dot(&self, other: Self) -> usize;
-    
-    // fn mul(&self, other: Self) -> Self;
-}
-
-
-#[derive(PartialEq, Debug)]
-pub struct Matrix<const J: usize, const I: usize> {
-    // The below box-less approach would work, but the matricies really need to go on the heap.
-    // Even though the compile-time constants do permit stack allocation, it's not a good
-    // use of stack memory, which could run out.
-    // values: [[usize; I]; J],
-
-    values: Box<[[usize; I]; J]>,
+#[derive(Debug,PartialEq)]
+pub struct Matrix {
+    values: Vec<Vec<usize>>,
     nrows: usize,
     ncols: usize
 }
 
-impl<const J: usize, const I: usize> MatrixLike<J,I> for Matrix<J,I> {
-    type Transposed = Matrix<I,J>;
-    type Concat<const Y: usize> = Matrix<J,Y>;
-    type Concatenated<const X: usize> = Matrix<J,X>;
-    // type Other<const A: usize, const B: usize> = Matrix<A,B>;
-
-    fn shape(&self) -> (usize,usize) {
-        (self.nrows,self.ncols)
+impl Display for Matrix {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f,"[")?; 
+        for j in 0..self.nrows {
+            if j != 0 {
+                write!(f," ")?;
+            }
+            write!(f,"[")?;
+            for i in 0..self.ncols {
+                if i != 0 {
+                    write!(f,", ")?;
+                }
+                write!(f,"{}",self.values[j][i])?;
+            }
+            write!(f,"]")?;
+            if j != self.nrows - 1 {
+                write!(f,"\n")?;
+            }
+        }
+        write!(f,"]")
     }
+}
 
-    fn transpose(&self) -> Matrix<I, J> {
+#[derive(Debug,PartialEq)]
+pub enum MatrixError {
+    DimMismatch((usize,usize),(usize,usize)),
+}
 
-        let mut res = [[0_usize; J]; I];
+impl Display for MatrixError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            MatrixError::DimMismatch(a,b) => {
+                write!(f,"Error: Matrix dimension ({},{}) is mismatched with ({},{})",a.0,a.1,b.0,b.1)
+            }
+        }
+        
+    }
+}
+
+impl Matrix {
+    pub fn new(data: Vec<Vec<usize>>) -> Matrix {
+        Matrix {
+            nrows: data.len(),
+            ncols: data[0].len(),
+            values: data,
+        }
+    }
+    pub fn transpose(&self) -> Matrix {
+        let mut res = vec![vec![0_usize; self.nrows]; self.ncols];
         for i in 0..self.ncols {
             for j in 0..self.nrows {
                 res[i][j] = self.values[j][i];
@@ -51,72 +64,116 @@ impl<const J: usize, const I: usize> MatrixLike<J,I> for Matrix<J,I> {
         }   
         Matrix::new(res)
     }
+    pub fn shape(&self) -> (usize,usize) {
+        (self.nrows,self.ncols)
+    }
+    pub fn matmul(a: &Matrix, b: &Matrix) -> Result<Matrix, MatrixError> {
+        if a.ncols == b.nrows {
+            let mut res = vec![vec![0_usize; b.ncols]; a.nrows];
+            for j_a in 0..a.nrows {
+                for i_b in 0..b.ncols {
+                    let mut dot_prod = 0_usize;
+                    for i_a in 0..a.ncols {
+                        dot_prod += a.values[j_a][i_a] * b.values[i_a][i_b]
+                    }
+                    res[j_a][i_b] = dot_prod;
+                }
+            }
+            return Ok(Matrix::new(res))
+        }
+        Err(MatrixError::DimMismatch(a.shape(), b.shape()))
+    }
+}
 
-    fn concat<const Y: usize, const X: usize>(&self, other: Self::Concat<Y>) -> Self::Concatenated<X> {
-        let mut res = [[0_usize; X]; J];
+impl Add for Matrix {
+    type Output = Self;
+    fn add(self, rhs: Self) -> Self::Output {
+        let mut res = vec![vec![0_usize; self.ncols]; self.nrows]; 
         for j in 0..self.nrows {
             for i in 0..self.ncols {
-                res[j][i] = self.values[j][i]
-            }
-        }
-        for j in 0..other.nrows {
-            for i in 0..other.ncols {
-                res[j][i+self.ncols] = other.values[j][i]
+                res[j][i] = self.values[j][i] + rhs.values[j][i];
             }
         }
         Matrix::new(res)
     }
 }
 
-
-impl<const J: usize, const I: usize> Matrix<J,I> {
-    pub fn new(data: [[usize; I]; J]) -> Matrix<J,I> {
-        Matrix {
-            nrows: data.len(),
-            ncols: data[0].len(),
-            values: Box::new(data),
+impl Mul for Matrix {
+    type Output = Self;
+    fn mul(self, rhs: Self) -> Self::Output {
+        let mut res = vec![vec![0_usize; self.ncols]; self.nrows]; 
+        for j in 0..self.nrows {
+            for i in 0..self.ncols {
+                res[j][i] = self.values[j][i] * rhs.values[j][i];
+            }
         }
+        Matrix::new(res) 
     }
 }
 
 
+
+
+
 #[cfg(test)]
 mod tests {
+    use std::vec;
+
     use super::*;
 
     #[test]
     fn new_matrix() {
-        let input = [[1,2],[4,5],[7,8]];
-        let mat = Matrix::new(input);
+        let mat = Matrix::new(vec![vec![1,2,3],vec![4,5,6]]);
         assert_eq!(mat, Matrix {
-            values: Box::new([[1_usize,2],[4,5],[7,8]]),
-            nrows: 3,
-            ncols: 2
+            ncols: 3,
+            nrows: 2,
+            values: vec![vec![1,2,3],vec![4,5,6]],
         });
     }
 
     #[test]
-    fn shape_method() {
-        let mat = Matrix {
-            values: Box::new([[1_usize,2],[4,5],[7,8]]),
-            nrows: 3,
-            ncols: 2
-        };
-        assert_eq!(mat.shape(),(3,2));
+    fn shape() {
+        let mat = Matrix::new(vec![vec![1,2,3],vec![4,5,6]]);
+        assert_eq!(mat.shape(), (2,3))
     }
 
     #[test]
     fn transpose() {
-        let mat = Matrix::new([[1_usize,2],[4,5],[7,8]]);
-        let res = mat.transpose();
-        assert_eq!(res, Matrix::new([[1_usize,4,7],[2,5,8]]));
+        let mat = Matrix::new(vec![vec![1,2,3],vec![4,5,6]]);
+        assert_eq!(mat.transpose(), Matrix {
+            values: vec![vec![1,4],vec![2,5],vec![3,6]],
+            nrows: 3,
+            ncols: 2
+        })
     }
 
     #[test]
-    fn concatenation() {
-        let a = Matrix::new([[1_usize],[2],[3]]);
-        let b = Matrix::new([[1_usize,2],[3,4],[5,6]]);
-        let res = a.concat(b);
-        assert_eq!(res, Matrix::new([[1_usize,1,2],[2,3,4],[3,5,6]]))
+    fn add_overflow() {
+        let a = Matrix::new(vec![vec![1,2,3],vec![4,5,6]]);
+        let b = Matrix::new(vec![vec![1,2,3],vec![4,5,6]]);
+        assert_eq!(a+b, Matrix::new(vec![vec![2,4,6],vec![8,10,12]]));
+    }
+
+    #[test]
+    fn mul_overflow() {
+        let a = Matrix::new(vec![vec![1,2,3],vec![4,5,6]]);
+        let b = Matrix::new(vec![vec![1,2,3],vec![4,5,6]]);
+        assert_eq!(a*b, Matrix::new(vec![vec![1,4,9],vec![16,25,36]]));
+    }
+
+    #[test]
+    fn matmul() {
+        let a = Matrix::new(vec![vec![1,2,3],vec![4,5,6]]);
+        let b = Matrix::new(vec![vec![1,2],vec![3,4],vec![5,6]]);
+
+        assert_eq!(Matrix::matmul(&a, &b), Ok(Matrix::new(vec![vec![22,28],vec![49,64]])));
+        assert_eq!(Matrix::matmul(&a, &a), Err(MatrixError::DimMismatch((2,3), (2,3))));
+    }
+
+    #[test]
+    fn display() {
+        let a = Matrix::new(vec![vec![1,2,3],vec![4,5,6]]);
+        assert_eq!(format!("{a}"),
+        "[[1, 2, 3]\n [4, 5, 6]]");
     }
 }

@@ -1,8 +1,21 @@
 use matrix_library::Matrix;
 
 fn main() {
-    let mat = Matrix::new([[1,2],[3,4],[5,6]]);
-    // println!("{:?}",mat.shape());
+    let a = Matrix::new(vec![vec![1,2,3,4,5],
+                            vec![4,5,6,7,8],
+                            vec![6,4,2,8,5],
+                            vec![5,6,6,3,9],
+                            vec![9,9,9,4,6],
+                            vec![5,4,3,7,7]]);
+    println!("\nSee the implimented display style:\n\n {a}");
 
-    // println!("{:?}",mat.transpose());
+    let b = Matrix::new(vec![vec![1,2],vec![3,4],vec![5,6]]);
+    match Matrix::matmul(&a, &a) {
+        Ok(mat) => {
+            println!("{mat}");
+        },
+        Err(err) => {
+            print!("\nAnd an implimented display for a custom error varient:\n\n {err}")
+        }
+    }
 }
