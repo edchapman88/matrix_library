@@ -50,7 +50,7 @@ impl Display for MatrixError {
     }
 }
 
-impl<T> Matrix<T> {
+impl<T:Clone> Matrix<T> {
     pub fn new(data: Vec<Vec<T>>) -> Matrix<T> {
         Matrix {
             nrows: data.len(),
@@ -61,7 +61,9 @@ impl<T> Matrix<T> {
     pub fn shape(&self) -> (usize,usize) {
         (self.nrows,self.ncols)
     }
-    
+    pub fn to_vec(&self) -> Vec<Vec<T>> {
+        self.values.clone()
+    }
 }
 
 impl Matrix<usize> {
@@ -241,5 +243,12 @@ mod tests {
         let a = Matrix::new(vec![vec![1,2,3],vec![4,5,6]]);
         assert_eq!(format!("{a}"),
         "[[1, 2, 3]\n [4, 5, 6]]");
+    }
+
+    #[test]
+    fn to_vec() {
+        let a = Matrix::new(vec![vec![1,2,3],vec![4,5,6]]);
+        assert_eq!(a.to_vec(),
+        vec![vec![1,2,3],vec![4,5,6]]);
     }
 }
