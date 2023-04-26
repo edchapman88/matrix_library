@@ -13,7 +13,7 @@ fn main() {
     let c = Matrix::new(vec![vec![1,2,3],vec![4,5,6]]);
 
     println!("\n{b} \n@\n {c} \n= ");
-    match Matrix::matmul(&b, &c) {
+    match b.matmul(&c) {
         Ok(mat) => {
             println!("{mat}");
         },
