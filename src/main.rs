@@ -10,12 +10,15 @@ fn main() {
     println!("\nSee the implimented display style:\n\n {a}");
 
     let b = Matrix::new(vec![vec![1,2],vec![3,4],vec![5,6]]);
-    match Matrix::matmul(&a, &a) {
+    let c = Matrix::new(vec![vec![1,2,3],vec![4,5,6]]);
+
+    println!("\n{b} \n@\n {c} \n= ");
+    match Matrix::matmul(&b, &c) {
         Ok(mat) => {
             println!("{mat}");
         },
         Err(err) => {
-            print!("\nAnd an implimented display for a custom error varient:\n\n {err}")
+            println!("\n\nAnd an implimented display for a custom error varient:\n\n {err}")
         }
     }
 }

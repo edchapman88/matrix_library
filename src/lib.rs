@@ -1,5 +1,6 @@
 use std::ops::{Add,Mul};
 use std::fmt::{Display};
+use std::error::Error;
 
 #[derive(Debug,PartialEq)]
 pub struct Matrix {
@@ -35,6 +36,8 @@ impl Display for Matrix {
 pub enum MatrixError {
     DimMismatch((usize,usize),(usize,usize)),
 }
+
+impl Error for MatrixError {}
 
 impl Display for MatrixError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
