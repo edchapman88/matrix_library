@@ -3,7 +3,6 @@ use std::error::Error;
 use std::fmt::Debug;
 use std::fmt::Display;
 use std::iter::zip;
-use std::marker::PhantomData;
 use std::ops::AddAssign;
 use std::ops::{Add, Mul};
 
