@@ -87,7 +87,6 @@ where
             }
             res.push_back(row);
         }
-        println!("{:?}", res);
         Matrix::new(res)
     }
 }
