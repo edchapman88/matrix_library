@@ -6,6 +6,9 @@ use std::iter::zip;
 use std::ops::AddAssign;
 use std::ops::{Add, Mul};
 
+use math_utils::{Exp, Pow};
+pub mod math_utils;
+
 #[derive(Debug, PartialEq, Clone)]
 pub struct Matrix<T> {
     values: VecDeque<VecDeque<T>>,
@@ -65,15 +68,29 @@ impl<T> Matrix<T> {
             values: data,
         }
     }
+
+    pub fn from_vecs(data: Vec<Vec<T>>) -> Matrix<T> {
+        let nrows = data.len();
+        let ncols = data[0].len();
+        let mut res = VecDeque::new();
+        for row in data {
+            let mut r = VecDeque::new();
+            for el in row {
+                r.push_back(el);
+            }
+            res.push_back(r);
+        }
+        Matrix {
+            values: res,
+            nrows,
+            ncols,
+        }
+    }
+
     pub fn shape(&self) -> (usize, usize) {
         (self.nrows, self.ncols)
     }
-}
 
-impl<T> Matrix<T>
-where
-    T: Debug + Clone,
-{
     pub fn transpose(mut self) -> Matrix<T> {
         let mut res = VecDeque::new();
 
@@ -89,21 +106,102 @@ where
         }
         Matrix::new(res)
     }
+
+    pub fn at(&self, idxs: (usize, usize)) -> Option<&T> {
+        if let Some(row) = self.values.get(idxs.0) {
+            if let Some(val) = row.get(idxs.1) {
+                return Some(val);
+            }
+        }
+        None
+    }
+
+    pub fn at_mut(&mut self, idxs: (usize, usize)) -> Option<&mut T> {
+        if let Some(row) = self.values.get_mut(idxs.0) {
+            if let Some(val) = row.get_mut(idxs.1) {
+                return Some(val);
+            }
+        }
+        None
+    }
+}
+
+impl<T> Iterator for Matrix<T> {
+    type Item = T;
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some(row) = self.values.get_mut(0) {
+            if let Some(el) = row.pop_front() {
+                return Some(el);
+            } else {
+                // pop empty first row
+                self.values.pop_front().unwrap();
+                // if there is another row, try and return the first element
+                if let Some(next_row) = self.values.get_mut(0) {
+                    if let Some(next_el) = next_row.pop_front() {
+                        return Some(next_el);
+                    }
+                }
+            }
+        }
+        None
+    }
+}
+
+impl<T: Exp + Clone> Exp for Matrix<T> {
+    fn exp(mut self) -> Matrix<T> {
+        for row in self.values.iter_mut() {
+            for el in row.iter_mut() {
+                *el = el.clone().exp()
+            }
+        }
+        self
+    }
+}
+
+impl<T: Pow + Clone> Pow<T> for Matrix<T> {
+    fn pow(mut self, exp: T) -> Matrix<T> {
+        for row in self.values.iter_mut() {
+            for el in row.iter_mut() {
+                *el = el.clone().pow(exp.clone())
+            }
+        }
+        self
+    }
+}
+
+impl<T> Matrix<T>
+where
+    T: Clone,
+{
+    pub fn fill(shape: (usize, usize), element: T) -> Matrix<T> {
+        let mut res = VecDeque::new();
+        for _ in 0..shape.0 {
+            let mut row = VecDeque::new();
+            for _ in 0..shape.1 {
+                row.push_back(element.clone());
+            }
+            res.push_back(row);
+        }
+        Matrix::new(res)
+    }
 }
 
 impl<T: Clone + Mul<Output = T> + AddAssign> Matrix<T> {
-    pub fn matmul(mut self, mut b: Matrix<T>) -> Result<Matrix<T>, MatrixError> {
-        if self.ncols != b.nrows {
-            return Err(MatrixError::DimMismatch(self.shape(), b.shape()));
+    pub fn matmul(&self, b_in: &Matrix<T>) -> Result<Matrix<T>, MatrixError> {
+        if self.ncols != b_in.nrows {
+            return Err(MatrixError::DimMismatch(self.shape(), b_in.shape()));
         }
+        //
+        let mut a = self.clone();
+        let mut b = b_in.clone();
 
         let mut res = VecDeque::new();
-        for j_a in 0..self.nrows {
+        for j_a in 0..a.nrows {
             let mut res_row = VecDeque::new();
             for i_b in 0..b.ncols {
                 // prepare column of B for dot product
                 let mut b_col = VecDeque::new();
-                if j_a < self.nrows - 1 {
+                if j_a < a.nrows - 1 {
                     // columns of B must be cloned, so that they may be used again
                     // on the next row of A
                     for row in b.values.iter() {
@@ -123,9 +221,9 @@ impl<T: Clone + Mul<Output = T> + AddAssign> Matrix<T> {
                     // row of A must be cloned for dot with next column of B
                     // (row of interest is always first row, because previous row is moved into a
                     // dot product before this row is considered)
-                    a_row = self.values.get(0).unwrap().clone();
+                    a_row = a.values.get(0).unwrap().clone();
                 } else {
-                    a_row = self.values.pop_front().unwrap();
+                    a_row = a.values.pop_front().unwrap();
                 }
 
                 // write dot product to result
@@ -190,11 +288,26 @@ impl<T: Mul<Output = T>> Mul for Matrix<T> {
     }
 }
 
+impl<T: Clone + Add<Output = T>> Add<T> for Matrix<T> {
+    type Output = Matrix<T>;
+    fn add(self, rhs: T) -> Self::Output {
+        let fill = Matrix::fill(self.shape(), rhs);
+        self + fill
+    }
+}
+
+impl<T: Clone + Mul<Output = T>> Mul<T> for Matrix<T> {
+    type Output = Matrix<T>;
+    fn mul(self, rhs: T) -> Self::Output {
+        let fill = Matrix::fill(self.shape(), rhs);
+        self * fill
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use std::collections::VecDeque;
-
     use super::*;
+    use std::collections::VecDeque;
 
     #[test]
     fn shape() {
@@ -254,6 +367,24 @@ mod tests {
     }
 
     #[test]
+    fn elemwise_exp() {
+        impl Exp for f64 {
+            fn exp(self) -> Self {
+                self.exp()
+            }
+        }
+        let a = Matrix::new(VecDeque::from([
+            VecDeque::from([1.0, -2.0]),
+            VecDeque::from([4.0, 5.0]),
+        ]));
+        let res = a.exp();
+        assert_eq!(*res.at((0, 0)).unwrap(), 1.0.exp());
+        assert_eq!(*res.at((0, 1)).unwrap(), (-2.0).exp());
+        assert_eq!(*res.at((1, 0)).unwrap(), 4.0.exp());
+        assert_eq!(*res.at((1, 1)).unwrap(), 5.0.exp());
+    }
+
+    #[test]
     fn matmul() {
         let a = Matrix::new(VecDeque::from([
             VecDeque::from([1, 2, 3]),
@@ -264,7 +395,7 @@ mod tests {
             VecDeque::from([3, 4]),
             VecDeque::from([5, 6]),
         ]));
-        let ans = a.clone().matmul(b);
+        let ans = a.clone().matmul(&b);
         assert_eq!(
             ans,
             Ok(Matrix::new(VecDeque::from([
@@ -273,7 +404,7 @@ mod tests {
             ])))
         );
         assert_eq!(
-            a.clone().matmul(a),
+            a.clone().matmul(&a),
             Err(MatrixError::DimMismatch((2, 3), (2, 3)))
         );
     }
@@ -285,5 +416,19 @@ mod tests {
             VecDeque::from([4, 5, 6]),
         ]));
         assert_eq!(format!("{a}"), "[[1, 2, 3]\n [4, 5, 6]]");
+    }
+
+    #[test]
+    fn iterate() {
+        let a = Matrix::new(VecDeque::from([
+            VecDeque::from([1, 2]),
+            VecDeque::from([4, 5]),
+        ]));
+        let mut a_itr = (a).into_iter();
+        assert_eq!(a_itr.next().unwrap(), 1);
+        assert_eq!(a_itr.next().unwrap(), 2);
+        assert_eq!(a_itr.next().unwrap(), 4);
+        assert_eq!(a_itr.next().unwrap(), 5);
+        assert_eq!(a_itr.next(), None);
     }
 }
