@@ -1,6 +1,9 @@
-use matrix_library::Matrix;
+use std::error::Error;
 
-fn main() {
+//use matrix_library::Matrix;
+mod load;
+
+fn main() -> Result<(), Box<dyn Error>> {
     // let a = Matrix::new(vec![vec![1,2,3,4,5],
     //                         vec![4,5,6,7,8],
     //                         vec![6,4,2,8,5],
@@ -21,4 +24,6 @@ fn main() {
     //         println!("\n\nAnd an implimented display for a custom error varient:\n\n {err}")
     //     }
     // }
+
+    load::run_tests()
 }
