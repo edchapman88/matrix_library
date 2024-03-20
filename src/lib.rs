@@ -1,3 +1,4 @@
+use float_cmp::ApproxEq;
 use std::collections::VecDeque;
 use std::error::Error;
 use std::fmt::Debug;
@@ -123,6 +124,26 @@ impl<T> Matrix<T> {
             }
         }
         None
+    }
+}
+
+impl<T, M> Matrix<T>
+where
+    T: Copy + ApproxEq<Margin = M>,
+    M: Copy + Default,
+{
+    pub fn compare(&self, other: &Self, margin: M) -> bool {
+        if self.shape() != other.shape() {
+            return false;
+        }
+        for row in self.values.iter().zip(other.values.iter()) {
+            for col in row.0.iter().zip(row.1.iter()) {
+                if !col.0.approx_eq(*col.1, margin) {
+                    return false;
+                }
+            }
+        }
+        true
     }
 }
 
